@@ -1,0 +1,2545 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+    <title>Micro Tank Arena - Tactical Cockpit</title>
+    <style>
+        :root {
+            --bg-cockpit: #06090e;
+            --panel-bg: rgba(13, 20, 32, 0.92);
+            --border-metal: #233549;
+            --border-glow: #00f0ff40;
+            --accent-cyan: #00f0ff;
+            --accent-amber: #ffb703;
+            --accent-red: #ff3366;
+            --accent-green: #00ff88;
+            --accent-purple: #a855f7;
+            --text-main: #e2e8f0;
+            --text-muted: #64748b;
+            --font-tactical: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Courier New", monospace;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        /* Chống kéo trang chỉ trên các nút điều khiển game (Joystick, Cần số, Nút bắn) */
+        #joystick-base, #joystick-thumb, .lever-slot, .lever-knob, #btn-fire, #btn-ulti, #btn-reload, .icon-btn {
+            touch-action: none;
+            user-select: none;
+            -webkit-user-select: none;
+        }
+
+        body {
+            background-color: var(--bg-cockpit);
+            background-image: 
+                radial-gradient(circle at 50% 50%, rgba(0, 240, 255, 0.05) 0%, transparent 75%),
+                linear-gradient(rgba(8, 12, 20, 0.96), rgba(6, 9, 14, 0.98)),
+                repeating-linear-gradient(0deg, transparent, transparent 2px, rgba(0, 240, 255, 0.015) 2px, rgba(0, 240, 255, 0.015) 4px);
+            color: var(--text-main);
+            font-family: var(--font-tactical);
+            overflow-x: hidden;
+            overflow-y: auto;
+            min-height: 100vh;
+            min-height: 100dvh;
+            width: 100vw;
+            display: flex;
+            flex-direction: column;
+            -webkit-overflow-scrolling: touch;
+        }
+
+        /* ==========================================
+           TOP HUD STATUS BAR
+        ========================================== */
+        #top-hud {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 8px 16px;
+            background: var(--panel-bg);
+            border-bottom: 2px solid var(--border-metal);
+            box-shadow: 0 4px 20px rgba(0, 0, 0, 0.8);
+            z-index: 20;
+            gap: 12px;
+            flex-shrink: 0;
+            flex-wrap: wrap;
+        }
+
+        .hud-left, .hud-right {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .tank-brand {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+        .tank-logo {
+            font-size: 16px;
+            filter: drop-shadow(0 0 6px var(--accent-cyan));
+        }
+        .tank-name {
+            font-size: 13px;
+            font-weight: 800;
+            letter-spacing: 1px;
+            color: var(--accent-cyan);
+            text-transform: uppercase;
+        }
+
+        /* Armor HP Bar */
+        .armor-box {
+            display: flex;
+            flex-direction: column;
+            gap: 3px;
+        }
+        .armor-header {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+        .armor-segments {
+            display: flex;
+            gap: 4px;
+        }
+        .armor-pip {
+            width: 20px;
+            height: 12px;
+            background: var(--accent-green);
+            border: 1px solid rgba(0, 255, 136, 0.6);
+            border-radius: 2px;
+            transform: skewX(-12deg);
+            box-shadow: 0 0 8px rgba(0, 255, 136, 0.4);
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+        .armor-pip.depleted {
+            background: #151d28;
+            border-color: #2b394a;
+            box-shadow: none;
+            opacity: 0.3;
+        }
+
+        /* Status Badge */
+        .state-tag {
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 10px;
+            letter-spacing: 1px;
+            border-radius: 4px;
+            background: rgba(0, 240, 255, 0.12);
+            color: var(--accent-cyan);
+            border: 1px solid var(--accent-cyan);
+            text-transform: uppercase;
+        }
+        .state-tag.stun { background: rgba(255, 183, 3, 0.2); color: var(--accent-amber); border-color: var(--accent-amber); animation: blink 0.5s infinite; }
+        .state-tag.dead { background: rgba(255, 51, 102, 0.2); color: var(--accent-red); border-color: var(--accent-red); animation: blink 0.3s infinite; }
+        .state-tag.reload { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; border-color: #94a3b8; }
+        .state-tag.offline { background: rgba(100, 116, 139, 0.2); color: #94a3b8; border-color: #475569; }
+
+        /* Network Status Badge */
+        .net-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 10px;
+            font-weight: 700;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border: 1px solid var(--border-metal);
+            background: rgba(15, 23, 42, 0.85);
+            color: var(--text-muted);
+            transition: all 0.2s ease;
+        }
+        .net-badge:hover {
+            border-color: var(--accent-cyan);
+            filter: brightness(1.15);
+        }
+        .net-badge.standalone {
+            color: var(--accent-cyan);
+            border-color: rgba(0, 240, 255, 0.5);
+            background: rgba(0, 240, 255, 0.12);
+        }
+        .net-badge.arena {
+            color: var(--accent-green);
+            border-color: rgba(0, 255, 136, 0.6);
+            background: rgba(0, 255, 136, 0.15);
+            box-shadow: 0 0 10px rgba(0, 255, 136, 0.25);
+        }
+        .net-dot {
+            width: 7px;
+            height: 7px;
+            border-radius: 50%;
+            background: currentColor;
+            display: inline-block;
+        }
+        .net-badge.arena .net-dot {
+            box-shadow: 0 0 6px var(--accent-green);
+            animation: pulse-dot 1.5s infinite;
+        }
+        @keyframes pulse-dot { 0%, 100% { opacity: 1; transform: scale(1); } 50% { opacity: 0.5; transform: scale(0.85); } }
+
+        /* Icon Buttons */
+        .icon-btn {
+            background: #141f2e;
+            border: 1px solid var(--border-metal);
+            color: var(--text-main);
+            width: 34px;
+            height: 34px;
+            border-radius: 6px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            outline: none;
+            font-size: 15px;
+            transition: background 0.15s, border-color 0.15s;
+        }
+        .icon-btn:active { background: var(--accent-cyan); color: #000; border-color: var(--accent-cyan); }
+
+        /* ==========================================
+           MAIN BATTLEFIELD / COCKPIT AREA
+        ========================================== */
+        #cockpit-body {
+            flex: 1;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 12px 20px;
+            position: relative;
+            gap: 16px;
+        }
+
+        /* --- LEFT CONTROLLER (JOYSTICK / LEVERS) --- */
+        .control-zone-left {
+            width: 220px;
+            height: 220px;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            position: relative;
+        }
+
+        /* Virtual Joystick */
+        #joystick-base {
+            width: 190px;
+            height: 190px;
+            background: radial-gradient(circle, #0e1724 0%, #060a10 80%);
+            border: 2px solid var(--border-metal);
+            border-radius: 50%;
+            position: relative;
+            box-shadow: inset 0 0 20px rgba(0, 0, 0, 0.9), 0 0 15px rgba(0, 240, 255, 0.15);
+            display: flex;
+            justify-content: center;
+            align-items: center;
+        }
+        #joystick-base::before {
+            content: "";
+            position: absolute;
+            width: 140px;
+            height: 140px;
+            border: 1px dashed rgba(0, 240, 255, 0.25);
+            border-radius: 50%;
+            pointer-events: none;
+        }
+        #joystick-base::after {
+            content: "LÁI XE (360°)";
+            position: absolute;
+            bottom: -22px;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: var(--text-muted);
+        }
+
+        #joystick-thumb {
+            width: 68px;
+            height: 68px;
+            background: radial-gradient(circle, #25384f 0%, #101926 80%);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 50%;
+            position: absolute;
+            box-shadow: 0 0 15px rgba(0, 240, 255, 0.5), inset 0 2px 4px rgba(255, 255, 255, 0.3);
+            cursor: pointer;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            pointer-events: none;
+        }
+        #joystick-thumb::after {
+            content: "";
+            width: 18px;
+            height: 18px;
+            background: var(--accent-cyan);
+            border-radius: 50%;
+            box-shadow: 0 0 8px var(--accent-cyan);
+        }
+
+        /* Dual Levers (Option Mode) */
+        #levers-container {
+            display: none;
+            gap: 24px;
+            align-items: center;
+        }
+        .lever-col {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+        }
+        .lever-title { font-size: 9px; font-weight: bold; color: var(--accent-cyan); }
+        .lever-slot {
+            width: 48px;
+            height: 170px;
+            background: #0f1622;
+            border: 2px solid var(--border-metal);
+            border-radius: 6px;
+            position: relative;
+            box-shadow: inset 0 0 10px rgba(0, 0, 0, 0.8);
+        }
+        .lever-knob {
+            width: 42px;
+            height: 50px;
+            background: linear-gradient(180deg, #2a3c50 0%, #141d28 100%);
+            border: 2px solid var(--accent-cyan);
+            border-radius: 4px;
+            position: absolute;
+            left: 1px;
+            top: 60px;
+            cursor: pointer;
+            box-shadow: 0 0 8px rgba(0, 240, 255, 0.4);
+        }
+
+        /* --- CENTER TACTICAL (RADAR, RETICLE & AMMO) --- */
+        #center-hud {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+            max-width: 320px;
+        }
+
+        .crosshair-reticle {
+            width: 120px;
+            height: 120px;
+            border-radius: 50%;
+            border: 1px dashed rgba(0, 240, 255, 0.35);
+            position: relative;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: radial-gradient(circle, rgba(0, 240, 255, 0.05) 0%, transparent 70%);
+        }
+        .reticle-core {
+            width: 12px;
+            height: 12px;
+            border: 2px solid var(--accent-amber);
+            border-radius: 50%;
+            box-shadow: 0 0 6px var(--accent-amber);
+        }
+        .reticle-h { position: absolute; width: 60px; height: 1px; background: rgba(0, 240, 255, 0.5); }
+        .reticle-v { position: absolute; width: 1px; height: 60px; background: rgba(0, 240, 255, 0.5); }
+
+        /* Artillery Shells Rack */
+        .ammo-rack-box {
+            background: var(--panel-bg);
+            padding: 8px 12px;
+            border: 1px solid var(--border-metal);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            width: 100%;
+        }
+        .ammo-rack-info {
+            display: flex;
+            justify-content: space-between;
+            width: 100%;
+            font-size: 10px;
+            color: var(--text-muted);
+            font-weight: 700;
+        }
+        .shell-magazine {
+            display: flex;
+            gap: 4px;
+            align-items: flex-end;
+            height: 32px;
+        }
+        .artillery-shell {
+            width: 8px;
+            height: 28px;
+            background: linear-gradient(180deg, var(--accent-amber) 0%, #b45309 60%, #78350f 100%);
+            border-radius: 3px 3px 1px 1px;
+            box-shadow: 0 0 5px rgba(255, 183, 3, 0.6);
+            transition: all 0.25s cubic-bezier(0.34, 1.56, 0.64, 1);
+            position: relative;
+        }
+        .artillery-shell::before {
+            content: "";
+            position: absolute;
+            top: -3px; left: 1px; right: 1px;
+            height: 3px;
+            background: #ef4444;
+            border-radius: 2px 2px 0 0;
+        }
+        .artillery-shell.spent {
+            height: 16px;
+            background: #1a222d;
+            box-shadow: none;
+            opacity: 0.25;
+            transform: scaleY(0.7);
+        }
+        .artillery-shell.spent::before { display: none; }
+
+        /* Speed / Direction Telemetry */
+        .telemetry-row {
+            display: flex;
+            gap: 16px;
+            font-size: 11px;
+            font-weight: bold;
+            color: var(--accent-cyan);
+            letter-spacing: 0.5px;
+        }
+
+        /* --- RIGHT CONTROLLER (WEAPONS: FIRE, RELOAD, ULTI) --- */
+        .control-zone-right {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 14px;
+            width: 220px;
+        }
+
+        /* Big Fire Button */
+        #btn-fire {
+            width: 126px;
+            height: 126px;
+            border-radius: 50%;
+            background: radial-gradient(circle, #ff2d55 0%, #a00028 100%);
+            border: 3px solid #ff5e7e;
+            box-shadow: 0 0 25px rgba(255, 45, 85, 0.7), inset 0 0 15px rgba(255, 255, 255, 0.3);
+            color: #fff;
+            font-size: 22px;
+            font-weight: 900;
+            letter-spacing: 2px;
+            cursor: pointer;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            outline: none;
+            transition: transform 0.08s ease, box-shadow 0.08s ease;
+        }
+        #btn-fire:active {
+            transform: scale(0.92);
+            box-shadow: 0 0 10px rgba(255, 45, 85, 0.9);
+        }
+        #btn-fire.locked {
+            background: #1f2833;
+            border-color: #37474f;
+            color: #546e7a;
+            box-shadow: none;
+            cursor: not-allowed;
+            filter: grayscale(0.8);
+        }
+
+        /* Sub Action Buttons */
+        .sub-weapon-row {
+            display: flex;
+            gap: 12px;
+            width: 100%;
+            justify-content: center;
+        }
+
+        #btn-reload {
+            flex: 1;
+            max-width: 80px;
+            height: 48px;
+            background: #141f2e;
+            border: 1px solid var(--border-metal);
+            border-radius: 6px;
+            color: var(--text-main);
+            font-size: 11px;
+            font-weight: 700;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: pointer;
+            outline: none;
+            gap: 2px;
+        }
+        #btn-reload:active { background: #1e2e42; color: #fff; }
+        #btn-reload.reloading {
+            border-color: var(--accent-amber);
+            color: var(--accent-amber);
+            animation: blink 0.8s infinite;
+        }
+
+        #btn-ulti {
+            flex: 1;
+            max-width: 90px;
+            height: 48px;
+            background: linear-gradient(135deg, #182232 0%, #0d1520 100%);
+            border: 1px solid #3b4d66;
+            border-radius: 6px;
+            color: #64748b;
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 0.5px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            cursor: not-allowed;
+            position: relative;
+            overflow: hidden;
+            outline: none;
+        }
+        #btn-ulti.ready {
+            background: radial-gradient(circle, #ffb703 0%, #b45309 100%);
+            border: 2px solid #fef08a;
+            color: #000;
+            box-shadow: 0 0 20px rgba(255, 183, 3, 0.8);
+            cursor: pointer;
+            animation: pulse-gold 0.8s infinite alternate;
+        }
+        #btn-ulti:active.ready { transform: scale(0.92); }
+        /* ==========================================
+           ENGINE IGNITION START / STOP (GIỮ ĐỂ ĐỀ MÁY)
+        ========================================== */
+        #engine-ignition-wrap {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            margin: 2px 0;
+            z-index: 10;
+        }
+
+        #btn-engine {
+            width: 140px;
+            height: 48px;
+            border-radius: 24px;
+            border: 2px solid #ef4444;
+            background: linear-gradient(180deg, #201014 0%, #0d0608 100%);
+            color: #fff;
+            position: relative;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.4), inset 0 0 8px rgba(0, 0, 0, 0.8);
+            transition: all 0.25s ease;
+            touch-action: none;
+            overflow: hidden;
+            outline: none;
+        }
+
+        #btn-engine.engine-off {
+            border-color: #ef4444;
+            box-shadow: 0 0 16px rgba(239, 68, 68, 0.5);
+            animation: pulse-ignition-off 2s infinite ease-in-out;
+        }
+
+        #btn-engine.engine-on {
+            border-color: var(--accent-green);
+            background: linear-gradient(180deg, #062419 0%, #04140e 100%);
+            box-shadow: 0 0 16px rgba(0, 255, 136, 0.45);
+        }
+
+        #btn-engine:active {
+            transform: scale(0.96);
+        }
+
+        .engine-btn-content {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 2;
+            pointer-events: none;
+        }
+
+        .engine-icon {
+            font-size: 13px;
+            line-height: 1;
+        }
+
+        .engine-label {
+            font-size: 11px;
+            font-weight: 900;
+            letter-spacing: 1px;
+            text-transform: uppercase;
+        }
+
+        #btn-engine.engine-off .engine-label { color: #f87171; }
+        #btn-engine.engine-on .engine-label { color: var(--accent-green); }
+
+        .engine-sub {
+            font-size: 8px;
+            font-weight: 700;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+        }
+
+        .engine-progress-bar {
+            position: absolute;
+            left: 0; top: 0; bottom: 0;
+            width: 0%;
+            background: linear-gradient(90deg, rgba(239, 68, 68, 0.4) 0%, rgba(255, 183, 3, 0.9) 100%);
+            z-index: 1;
+            transition: width 0.05s linear;
+            pointer-events: none;
+        }
+
+        @keyframes pulse-ignition-off {
+            0%, 100% { box-shadow: 0 0 10px rgba(239, 68, 68, 0.3); border-color: rgba(239, 68, 68, 0.6); }
+            50% { box-shadow: 0 0 22px rgba(239, 68, 68, 0.85); border-color: rgba(239, 68, 68, 1); }
+        }
+
+        /* Locked overlays when engine is off */
+        .controls-locked-hint {
+            opacity: 0.42;
+            filter: grayscale(0.7);
+            pointer-events: none !important;
+            transition: opacity 0.3s, filter 0.3s;
+        }
+
+        /* ==========================================
+           RESPONSIVE PORTRAIT MODE (CHO MÀN HÌNH DỌC)
+        ========================================== */
+        @media (max-width: 768px) and (orientation: portrait) {
+            #cockpit-body {
+                flex-direction: column;
+                justify-content: flex-start;
+                align-items: center;
+                padding: 12px 10px;
+                gap: 16px;
+                overflow-y: auto;
+                -webkit-overflow-scrolling: touch;
+                touch-action: pan-y;
+            }
+            .control-zone-left {
+                width: 180px;
+                height: 180px;
+                flex-shrink: 0;
+            }
+            #joystick-base {
+                width: 160px;
+                height: 160px;
+            }
+            #joystick-thumb {
+                width: 56px;
+                height: 56px;
+            }
+            #center-hud {
+                width: 100%;
+                max-width: 320px;
+                flex-shrink: 0;
+            }
+            .crosshair-reticle {
+                width: 80px;
+                height: 80px;
+            }
+            .control-zone-right {
+                width: 100%;
+                max-width: 260px;
+                flex-shrink: 0;
+            }
+            #btn-fire {
+                width: 100px;
+                height: 100px;
+                font-size: 18px;
+            }
+        }
+
+        /* ==========================================
+           RESPONSIVE SHORT LANDSCAPE (ĐIỆN THOẠI XOAY NGANG)
+        ========================================== */
+        @media (max-height: 480px) and (orientation: landscape) {
+            #top-hud {
+                padding: 4px 10px;
+                gap: 6px;
+            }
+            #cockpit-body {
+                padding: 4px 8px;
+                gap: 6px;
+            }
+            .control-zone-left {
+                width: 150px;
+                height: 150px;
+                flex-shrink: 0;
+            }
+            #joystick-base {
+                width: 140px;
+                height: 140px;
+            }
+            #joystick-thumb {
+                width: 48px;
+                height: 48px;
+            }
+            #center-hud {
+                max-width: 240px;
+                gap: 4px;
+            }
+            .crosshair-reticle {
+                width: 56px;
+                height: 56px;
+            }
+            #btn-engine {
+                width: 110px;
+                height: 34px;
+                border-radius: 17px;
+            }
+            #btn-engine .engine-label { font-size: 9px; }
+            #btn-engine .engine-sub { font-size: 7px; }
+            #btn-engine .engine-icon { font-size: 10px; }
+            .squad-box {
+                padding: 3px 6px;
+                gap: 3px;
+            }
+            .squad-members-row {
+                max-height: 55px;
+            }
+            .ammo-rack-box {
+                padding: 3px 6px;
+                gap: 2px;
+            }
+            .shell-magazine {
+                height: 22px;
+            }
+            .artillery-shell {
+                height: 18px;
+                width: 6px;
+            }
+            .control-zone-right {
+                width: 150px;
+                gap: 6px;
+                flex-shrink: 0;
+            }
+            #btn-fire {
+                width: 80px;
+                height: 80px;
+                font-size: 15px;
+            }
+            .sub-weapon-row button {
+                padding: 4px 6px;
+                font-size: 10px;
+            }
+        }
+
+        /* ==========================================
+           SETTINGS & LOBBY MODAL STYLING (TOUCH SCROLLABLE)
+        ========================================== */
+        #settings-modal, #lobby-modal {
+            display: none;
+            position: fixed;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background: rgba(4, 7, 12, 0.88);
+            backdrop-filter: blur(8px);
+            z-index: 100;
+            padding: 12px;
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            touch-action: pan-y !important;
+        }
+        #settings-modal.active, #lobby-modal.active {
+            display: flex !important;
+        }
+
+        .modal-box {
+            margin: auto;
+            width: 100%;
+            max-width: 460px;
+            max-height: calc(100dvh - 24px);
+            overflow-y: auto !important;
+            -webkit-overflow-scrolling: touch !important;
+            overscroll-behavior: contain;
+            touch-action: pan-y !important;
+            background: #0d1522;
+            border: 2px solid var(--border-metal);
+            border-radius: 10px;
+            padding: 18px;
+            box-shadow: 0 0 35px rgba(0, 0, 0, 0.9);
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+        .modal-box * {
+            touch-action: pan-y;
+        }
+        input, select, textarea {
+            touch-action: auto !important;
+            user-select: text !important;
+            -webkit-user-select: text !important;
+        }
+
+        /* Custom Tactical Scrollbars */
+        .modal-box::-webkit-scrollbar,
+        .squad-members-row::-webkit-scrollbar,
+        #modal-lobby-roster-list::-webkit-scrollbar,
+        #cockpit-body::-webkit-scrollbar,
+        body::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        .modal-box::-webkit-scrollbar-track,
+        .squad-members-row::-webkit-scrollbar-track,
+        #modal-lobby-roster-list::-webkit-scrollbar-track,
+        #cockpit-body::-webkit-scrollbar-track,
+        body::-webkit-scrollbar-track {
+            background: rgba(10, 16, 26, 0.6);
+            border-radius: 3px;
+        }
+        .modal-box::-webkit-scrollbar-thumb,
+        .squad-members-row::-webkit-scrollbar-thumb,
+        #modal-lobby-roster-list::-webkit-scrollbar-thumb,
+        #cockpit-body::-webkit-scrollbar-thumb,
+        body::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 3px;
+            box-shadow: 0 0 6px var(--accent-cyan);
+        }
+        .modal-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-metal);
+            padding-bottom: 10px;
+        }
+        .modal-header h2 { font-size: 16px; color: var(--accent-cyan); letter-spacing: 1px; }
+        .modal-close { background: none; border: none; color: #94a3b8; font-size: 22px; cursor: pointer; }
+
+        .setting-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 13px;
+        }
+
+        .toggle-switch {
+            width: 44px;
+            height: 24px;
+            background: #1e293b;
+            border-radius: 12px;
+            position: relative;
+            cursor: pointer;
+            transition: background 0.2s;
+        }
+        .toggle-switch.on { background: var(--accent-cyan); }
+        .toggle-switch::after {
+            content: "";
+            position: absolute;
+            top: 3px; left: 3px;
+            width: 18px; height: 18px;
+            background: #fff;
+            border-radius: 50%;
+            transition: transform 0.2s;
+        }
+        .toggle-switch.on::after { transform: translateX(20px); }
+
+        .modal-btn-action {
+            background: #0284c7;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 13px;
+        }
+        .modal-btn-reset {
+            background: #991b1b;
+            color: #fff;
+            border: none;
+            padding: 10px;
+            border-radius: 6px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 12px;
+        }
+
+        /* Wi-Fi Section in Modal */
+        .wifi-box {
+            border: 1px solid var(--border-metal);
+            background: #090f18;
+            border-radius: 8px;
+            padding: 12px;
+            display: flex;
+            flex-direction: column;
+            gap: 10px;
+        }
+        .wifi-title-row {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            font-weight: bold;
+            color: var(--accent-cyan);
+        }
+        .input-dark {
+            background: #141f2e;
+            border: 1px solid var(--border-metal);
+            color: #fff;
+            padding: 9px;
+            border-radius: 6px;
+            font-size: 13px;
+            outline: none;
+            width: 100%;
+        }
+
+        @keyframes blink { 0%, 100% { opacity: 1; } 50% { opacity: 0.3; } }
+        @keyframes pulse-gold { 0% { box-shadow: 0 0 10px rgba(255, 183, 3, 0.5); } 100% { box-shadow: 0 0 25px rgba(255, 183, 3, 0.95); } }
+
+        /* ==========================================
+           TEAM & SQUAD CUSTOMIZATION & HUD
+        ========================================== */
+        .team-badge {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 11px;
+            font-weight: 800;
+            padding: 4px 10px;
+            border-radius: 4px;
+            letter-spacing: 0.5px;
+            cursor: pointer;
+            border: 1px solid var(--border-metal);
+            transition: all 0.2s ease;
+        }
+        .team-badge.team-blue {
+            background: rgba(0, 240, 255, 0.15);
+            border-color: var(--accent-cyan);
+            color: var(--accent-cyan);
+            box-shadow: 0 0 10px rgba(0, 240, 255, 0.2);
+        }
+        .team-badge.team-red {
+            background: rgba(255, 51, 102, 0.15);
+            border-color: var(--accent-red);
+            color: var(--accent-red);
+            box-shadow: 0 0 10px rgba(255, 51, 102, 0.2);
+        }
+        .team-badge:hover {
+            filter: brightness(1.2);
+            transform: translateY(-1px);
+        }
+        .squad-pill {
+            background: rgba(0, 0, 0, 0.5);
+            padding: 1px 6px;
+            border-radius: 10px;
+            font-size: 10px;
+        }
+
+        /* Squad Monitor Card in Center HUD */
+        .squad-box {
+            background: var(--panel-bg);
+            padding: 6px 10px;
+            border: 1px solid var(--border-metal);
+            border-radius: 6px;
+            display: flex;
+            flex-direction: column;
+            gap: 5px;
+            width: 100%;
+            max-width: 320px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+        }
+        .squad-box-header {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 10px;
+            font-weight: 800;
+            color: var(--text-muted);
+            letter-spacing: 0.5px;
+            border-bottom: 1px solid rgba(35, 53, 73, 0.6);
+            padding-bottom: 3px;
+        }
+        .pulse-radar-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--accent-green);
+            display: inline-block;
+            box-shadow: 0 0 6px var(--accent-green);
+            animation: radar-pulse 1.8s infinite;
+        }
+        @keyframes radar-pulse {
+            0% { transform: scale(0.9); opacity: 0.6; }
+            50% { transform: scale(1.3); opacity: 1; }
+            100% { transform: scale(0.9); opacity: 0.6; }
+        }
+        .squad-members-row {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            max-height: 90px;
+            overflow-y: auto;
+        }
+        .squad-member-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(15, 23, 42, 0.7);
+            border: 1px solid rgba(35, 53, 73, 0.7);
+            border-radius: 4px;
+            padding: 3px 6px;
+            font-size: 10px;
+        }
+        .squad-member-item.blue {
+            border-left: 3px solid var(--accent-cyan);
+        }
+        .squad-member-item.red {
+            border-left: 3px solid var(--accent-red);
+        }
+        .squad-member-name {
+            font-weight: 700;
+            color: var(--text-main);
+            display: flex;
+            align-items: center;
+            gap: 4px;
+            max-width: 100px;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+        .squad-member-hp-pips {
+            display: flex;
+            gap: 2px;
+        }
+        .squad-pip {
+            width: 7px;
+            height: 9px;
+            border-radius: 1px;
+            transform: skewX(-12deg);
+        }
+        .squad-pip.blue {
+            background: var(--accent-cyan);
+            box-shadow: 0 0 4px rgba(0, 240, 255, 0.5);
+        }
+        .squad-pip.red {
+            background: var(--accent-red);
+            box-shadow: 0 0 4px rgba(255, 51, 102, 0.5);
+        }
+        .squad-pip.depleted {
+            background: #182230;
+            box-shadow: none;
+            opacity: 0.25;
+        }
+        .squad-member-tag {
+            font-size: 8px;
+            font-weight: 800;
+            padding: 1px 4px;
+            border-radius: 2px;
+            text-transform: uppercase;
+        }
+        .squad-member-tag.battle { background: rgba(0, 255, 136, 0.15); color: var(--accent-green); }
+        .squad-member-tag.reload { background: rgba(148, 163, 184, 0.2); color: #cbd5e1; }
+        .squad-member-tag.stun { background: rgba(255, 183, 3, 0.2); color: var(--accent-amber); }
+        .squad-member-tag.dead { background: rgba(255, 51, 102, 0.2); color: var(--accent-red); }
+
+
+        .team-selector-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 6px;
+        }
+        .team-card {
+            border: 2px solid var(--border-metal);
+            background: #090f18;
+            border-radius: 8px;
+            padding: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+        }
+        .team-card.team-card-blue:hover, .team-card.team-card-blue.selected {
+            border-color: var(--accent-cyan);
+            background: rgba(0, 240, 255, 0.12);
+            box-shadow: 0 0 12px rgba(0, 240, 255, 0.3);
+        }
+        .team-card.team-card-red:hover, .team-card.team-card-red.selected {
+            border-color: var(--accent-red);
+            background: rgba(255, 51, 102, 0.12);
+            box-shadow: 0 0 12px rgba(255, 51, 102, 0.3);
+        }
+        .team-card-title {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            font-size: 12px;
+            font-weight: 800;
+        }
+        .team-card-desc {
+            font-size: 10px;
+            color: var(--text-muted);
+            line-height: 1.3;
+        }
+    </style>
+</head>
+<body>
+
+    <!-- TOP HUD STATUS BAR -->
+    <div id="top-hud">
+        <div class="hud-left">
+            <div class="tank-brand">
+                <span class="tank-logo">⚡</span>
+                <span class="tank-name" id="tank-display-name">TIGER 01</span>
+            </div>
+            <!-- Team Badge (Clickable to customize) -->
+            <div class="team-badge team-blue" id="btn-team-profile" title="Bấm để đổi tên xe / đổi đội">
+                <span id="team-icon-label">🔵</span>
+                <span id="team-name-label">BLUE TEAM</span>
+                <span class="squad-pill" id="squad-count-pill">1P</span>
+            </div>
+            <!-- Net Status Badge -->
+            <div class="net-badge standalone" id="net-badge" title="Bấm để mở Cài đặt mạng">
+                <span class="net-dot"></span>
+                <span id="net-mode-label">STANDALONE</span>
+                <span id="net-info-label" style="opacity: 0.8; font-size: 9px;">(Ch.1)</span>
+            </div>
+            <!-- Armor HP Bar -->
+            <div class="armor-box">
+                <div class="armor-header">
+                    <span>ARMOR</span>
+                    <span id="hp-text">5 / 5</span>
+                </div>
+                <div class="armor-segments" id="hp-rack">
+                    <div class="armor-pip"></div>
+                    <div class="armor-pip"></div>
+                    <div class="armor-pip"></div>
+                    <div class="armor-pip"></div>
+                    <div class="armor-pip"></div>
+                </div>
+            </div>
+        </div>
+
+        <div class="hud-right">
+            <span class="state-tag" id="status-tag">READY</span>
+            <button class="icon-btn" id="btn-lobby-open" title="Tùy chỉnh xe & Tạo/Vào đội" style="color: var(--accent-cyan); font-size: 15px;">🛡️</button>
+            <button class="icon-btn" id="btn-quick-forget" title="Quên Wi-Fi nhà nhanh (về kênh 1)" style="font-size: 13px; color: #f87171;">🚫</button>
+            <button class="icon-btn" id="btn-fullscreen" title="Phóng to toàn màn hình">⛶</button>
+            <button class="icon-btn" id="btn-settings" title="Cài đặt">⚙</button>
+        </div>
+    </div>
+
+    <!-- MAIN BATTLEFIELD / COCKPIT -->
+    <div id="cockpit-body">
+        <!-- 1. LEFT CONTROLLER: VIRTUAL JOYSTICK -->
+        <div class="control-zone-left">
+            <div id="joystick-base">
+                <div id="joystick-thumb"></div>
+            </div>
+
+            <!-- DUAL LEVERS FALLBACK (Configurable in Settings) -->
+            <div id="levers-container">
+                <div class="lever-col">
+                    <span class="lever-title">TRÁI</span>
+                    <div class="lever-slot" id="slot-left">
+                        <div class="lever-knob" id="knob-left"></div>
+                    </div>
+                </div>
+                <div class="lever-col">
+                    <span class="lever-title">PHẢI</span>
+                    <div class="lever-slot" id="slot-right">
+                        <div class="lever-knob" id="knob-right"></div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 2. CENTER TACTICAL HUD -->
+        <div id="center-hud">
+            <div class="crosshair-reticle">
+                <div class="reticle-h"></div>
+                <div class="reticle-v"></div>
+                <div class="reticle-core"></div>
+            </div>
+
+            <!-- Engine Ignition Start/Stop Switch (Giữ 1.2s để nổ máy) -->
+            <div id="engine-ignition-wrap">
+                <button id="btn-engine" class="engine-off" title="Nhấn giữ 1.2s để ĐỀ MÁY / Bấm để TẮT MÁY">
+                    <div class="engine-progress-bar" id="engine-progress-bar"></div>
+                    <div class="engine-btn-content">
+                        <div style="display: flex; align-items: center; gap: 4px;">
+                            <span class="engine-icon" id="engine-icon">⚡</span>
+                            <span class="engine-label" id="engine-label">GIỮ ĐỀ MÁY</span>
+                        </div>
+                        <span class="engine-sub" id="engine-sub">[HOLD 1.2s]</span>
+                    </div>
+                </button>
+            </div>
+
+            <!-- Squad Monitor Card -->
+            <div class="squad-box" id="squad-monitor-card">
+                <div class="squad-box-header">
+                    <div style="display: flex; align-items: center; gap: 6px;">
+                        <span class="pulse-radar-dot"></span>
+                        <span style="font-weight: 800; font-size: 10px; letter-spacing: 0.5px;">SQUAD BATTLE NET</span>
+                    </div>
+                    <span id="squad-ratio-badge" style="font-size: 10px; font-weight: 800; color: var(--accent-cyan);">🔵 1 vs 🔴 0</span>
+                </div>
+                <div class="squad-members-row" id="squad-roster-list">
+                    <div style="font-size: 9px; color: var(--text-muted); text-align: center; padding: 2px;">Dò tìm xe qua Mesh...</div>
+                </div>
+            </div>
+
+            <!-- Ammo Magazine -->
+            <div class="ammo-rack-box">
+                <div class="ammo-rack-info">
+                    <span>PHÁO 10 VIÊN</span>
+                    <span id="ammo-count">10 / 10</span>
+                </div>
+                <div class="shell-magazine" id="shell-rack">
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                    <div class="artillery-shell"></div>
+                </div>
+            </div>
+
+            <div class="telemetry-row">
+                <span>L: <span id="tele-l">0%</span></span>
+                <span>R: <span id="tele-r">0%</span></span>
+            </div>
+        </div>
+
+        <!-- 3. RIGHT WEAPON CONSOLE -->
+        <div class="control-zone-right">
+            <button id="btn-fire">
+                <span>FIRE</span>
+            </button>
+
+            <div class="sub-weapon-row">
+                <button id="btn-reload">
+                    <span>NẠP ĐẠN</span>
+                    <span style="font-size: 9px; color: #94a3b8;">[3.5s]</span>
+                </button>
+
+                <button id="btn-ulti">
+                    <span id="ulti-text">ULTI</span>
+                    <span id="ulti-pct" style="font-size: 8px;">0%</span>
+                    <div class="ulti-fill-bar" id="ulti-bar"></div>
+                </button>
+            </div>
+        </div>
+    </div>
+
+    <!-- LOBBY / TANK CUSTOMIZATION MODAL -->
+    <div id="lobby-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>🎮 CHIẾN TUYẾN & TÙY CHỈNH XE</h2>
+                <button class="modal-close" id="lobby-close">&times;</button>
+            </div>
+
+            <div style="display: flex; flex-direction: column; gap: 12px;">
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">TÊN CHIẾN XA / CALLSIGN:</label>
+                    <input type="text" id="input-callsign" class="input-dark" maxlength="12" placeholder="VD: Tiger-01">
+                </div>
+
+                <div>
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-muted); display: block; margin-bottom: 4px;">CHỌN CHIẾN TUYẾN & MÀU ĐÈN XE (LED RGB):</label>
+                    <div class="team-selector-grid">
+                        <div class="team-card team-card-blue selected" id="card-team-blue">
+                            <div class="team-card-title" style="color: var(--accent-cyan);">
+                                <span>🔵</span>
+                                <b>TEAM BLUE</b>
+                            </div>
+                            <span class="team-card-desc">LED Cyan (#00f0ff). Không bị đồng đội Blue bắn trúng.</span>
+                        </div>
+                        <div class="team-card team-card-red" id="card-team-red">
+                            <div class="team-card-title" style="color: var(--accent-red);">
+                                <span>🔴</span>
+                                <b>TEAM RED</b>
+                            </div>
+                            <span class="team-card-desc">LED Crimson (#ff3366). Không bị đồng đội Red bắn trúng.</span>
+                        </div>
+                    </div>
+                </div>
+
+                <div style="display: flex; justify-content: space-between; align-items: center;">
+                    <label style="font-size: 11px; font-weight: 700; color: var(--text-muted);">SỐ HIỆU XE (PLAYER ID):</label>
+                    <select id="select-player-id" class="input-dark" style="width: auto; padding: 6px 14px;">
+                        <option value="1">Xe #1</option>
+                        <option value="2">Xe #2</option>
+                        <option value="3">Xe #3</option>
+                        <option value="4">Xe #4</option>
+                        <option value="5">Xe #5</option>
+                        <option value="6">Xe #6</option>
+                        <option value="7">Xe #7</option>
+                        <option value="8">Xe #8</option>
+                    </select>
+                </div>
+
+                <button class="modal-btn-action" id="btn-save-profile" style="background: linear-gradient(90deg, #0284c7, #00f0ff); color: #000; font-weight: 900; font-size: 13px; letter-spacing: 1px;">
+                    🚀 LƯU CẤU HÌNH & ĐỔI MÀU XE (SYNC LED)
+                </button>
+                <div id="profile-status-msg" style="font-size: 11px; text-align: center; color: var(--accent-green); min-height: 16px;"></div>
+
+                <!-- Live Mesh Roster in Modal -->
+                <div style="border-top: 1px solid var(--border-metal); padding-top: 10px;">
+                    <span style="font-size: 11px; font-weight: 700; color: var(--accent-cyan); display: block; margin-bottom: 6px;">📡 CÁC XE ĐANG ONLINE TRONG MESH:</span>
+                    <div id="modal-lobby-roster-list" style="display: flex; flex-direction: column; gap: 5px; max-height: 120px; overflow-y: auto;">
+                        <div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 6px;">Đang quét mạng ESP-NOW Mesh...</div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- SETTINGS MODAL -->
+    <div id="settings-modal">
+        <div class="modal-box">
+            <div class="modal-header">
+                <h2>CÀI ĐẶT & THI ĐẤU</h2>
+                <button class="modal-close" id="modal-close">&times;</button>
+            </div>
+
+            <div class="setting-row">
+                <span>Kiểu điều khiển: <b>Joystick Analog 360°</b></span>
+                <div class="toggle-switch on" id="toggle-joystick-mode"></div>
+            </div>
+
+            <div class="setting-row">
+                <span>Âm thanh buồng lái (Web Audio)</span>
+                <div class="toggle-switch on" id="toggle-sound"></div>
+            </div>
+
+            <div class="setting-row">
+                <span>Rung phản hồi (Haptic)</span>
+                <div class="toggle-switch on" id="toggle-haptic"></div>
+            </div>
+
+            <div class="setting-row">
+                <span>Đảo chiều động cơ Trái</span>
+                <div class="toggle-switch" id="toggle-inv-left"></div>
+            </div>
+
+            <div class="setting-row">
+                <span>Đảo chiều động cơ Phải</span>
+                <div class="toggle-switch" id="toggle-inv-right"></div>
+            </div>
+
+            <button class="modal-btn-reset" id="btn-reset-match">HỒI SINH XE (RESPAWN / RESET MATCH)</button>
+
+            <!-- CẤU HÌNH WI-FI HYBRID ALWAYS-ON -->
+            <div class="wifi-box">
+                <div class="wifi-title-row">
+                    <span>📡 MẠNG HYBRID ALWAYS-ON</span>
+                    <button id="btn-scan-wifi" style="background: #1e293b; border: 1px solid var(--border-metal); color: var(--accent-cyan); padding: 5px 10px; border-radius: 4px; font-size: 11px; cursor: pointer;">🔍 Quét Wi-Fi</button>
+                </div>
+
+                <!-- Live Network Info Card -->
+                <div style="background: #101826; border: 1px solid #1e2e42; border-radius: 6px; padding: 10px; font-size: 11px; display: flex; flex-direction: column; gap: 5px;">
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">Trạng thái:</span>
+                        <b id="modal-net-mode" style="color: var(--accent-cyan);">STANDALONE (Độc lập)</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">SoftAP Luôn Mở:</span>
+                        <b style="color: var(--text-main);">192.168.4.1 (Kênh 1)</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">IP Mạng Nhà:</span>
+                        <b id="modal-sta-ip" style="color: var(--text-muted);">Chưa kết nối</b>
+                    </div>
+                    <div style="display: flex; justify-content: space-between;">
+                        <span style="color: var(--text-muted);">Kênh ESP-NOW:</span>
+                        <b id="modal-espnow-chan" style="color: var(--accent-amber);">Channel 1</b>
+                    </div>
+                </div>
+
+                <select id="wifi-ssid-select" class="input-dark">
+                    <option value="">-- Danh sách Wi-Fi quét được --</option>
+                </select>
+                <input type="text" id="wifi-ssid-input" placeholder="Hoặc tự gõ tên Wi-Fi (SSID)..." class="input-dark">
+                <input type="password" id="wifi-pass-input" placeholder="Mật khẩu Wi-Fi..." class="input-dark">
+                <div style="display: flex; gap: 8px;">
+                    <button id="btn-save-wifi" class="modal-btn-action" style="flex: 1;">LƯU & KẾT NỐI</button>
+                    <button id="btn-reset-wifi" style="background: #991b1b; color: #fff; border: 1px solid #dc2626; padding: 10px 14px; border-radius: 6px; font-weight: bold; cursor: pointer; font-size: 11px; white-space: nowrap;">QUÊN WI-FI</button>
+                </div>
+                <span id="wifi-status-msg" style="font-size: 11px; color: var(--accent-amber); display: none; line-height: 1.4;"></span>
+            </div>
+        </div>
+    </div>
+
+    <!-- SCRIPT LOGIC -->
+    <script>
+        // ==========================================
+        // 1. AUDIO SYNTHESIZER (WEB AUDIO API TACTICAL SUITE)
+        // ==========================================
+        const Sound = {
+            audioCtx: null,
+            engineRunning: false,
+            idleOsc: null,
+            idleGain: null,
+            pulseGain: null,
+            pulseTimer: null,
+            currentThrottle: 0,
+
+            init() {
+                if (!this.audioCtx) {
+                    this.audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+                }
+                if (this.audioCtx.state === 'suspended') {
+                    this.audioCtx.resume();
+                }
+            },
+
+            startEngine() {
+                if (!config.sound) return;
+                this.init();
+                if (this.engineRunning && this.idleOsc) return;
+                this.engineRunning = true;
+
+                if (this.idleOsc) {
+                    try { this.idleOsc.stop(); this.idleOsc.disconnect(); } catch(e){}
+                    this.idleOsc = null;
+                }
+                if (this.pulseTimer) {
+                    clearInterval(this.pulseTimer);
+                    this.pulseTimer = null;
+                }
+
+                const now = this.audioCtx.currentTime;
+                this.idleOsc = this.audioCtx.createOscillator();
+                this.idleGain = this.audioCtx.createGain();
+                this.pulseGain = this.audioCtx.createGain();
+
+                // Dải tần 110Hz - 260Hz tạo tiếng máy diesel xe tăng gầm gừ, loa điện thoại nghe cực rõ
+                this.idleOsc.type = 'sawtooth';
+                this.idleOsc.frequency.setValueAtTime(110, now);
+
+                this.idleOsc.connect(this.idleGain);
+                this.idleGain.connect(this.pulseGain);
+                this.pulseGain.connect(this.audioCtx.destination);
+
+                this.idleGain.gain.setValueAtTime(0.24, now);
+                this.idleOsc.start(now);
+
+                let isIgnition = false;
+                this.pulseTimer = setInterval(() => {
+                    if (!this.engineRunning || !this.audioCtx) return;
+                    const t = this.audioCtx.currentTime;
+                    if (this.currentThrottle < 15) {
+                        isIgnition = !isIgnition;
+                        this.pulseGain.gain.setValueAtTime(isIgnition ? 0.32 : 0.08, t);
+                    } else {
+                        this.pulseGain.gain.setValueAtTime(0.36, t);
+                    }
+                }, 85);
+            },
+
+            stopEngine() {
+                if (!this.engineRunning && !this.idleOsc) return;
+                this.engineRunning = false;
+                if (this.pulseTimer) { clearInterval(this.pulseTimer); this.pulseTimer = null; }
+                if (this.idleOsc) {
+                    try {
+                        const oldOsc = this.idleOsc;
+                        this.idleGain.gain.exponentialRampToValueAtTime(0.001, this.audioCtx.currentTime + 0.25);
+                        setTimeout(() => { try { oldOsc.stop(); oldOsc.disconnect(); } catch(e){} }, 280);
+                    } catch(e) {}
+                    this.idleOsc = null;
+                }
+            },
+
+            playCrank() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.exponentialRampToValueAtTime(65, now + 0.11);
+                gain.gain.setValueAtTime(0.35, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.11);
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.11);
+            },
+
+            playIgnitionSuccess() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(110, now);
+                osc.frequency.linearRampToValueAtTime(320, now + 0.25);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.65);
+                gain.gain.setValueAtTime(0.5, now);
+                gain.gain.exponentialRampToValueAtTime(0.2, now + 0.65);
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.65);
+                setTimeout(() => { if (isEngineOn) this.startEngine(); }, 400);
+            },
+
+            setThrottle(pct) {
+                if (!config.sound || !isEngineOn) return;
+                if (!this.engineRunning) this.startEngine();
+                this.currentThrottle = Math.max(0, Math.min(100, pct));
+                if (!this.idleOsc || !this.audioCtx) return;
+                const targetFreq = 110 + (this.currentThrottle / 100) * (260 - 110);
+                this.idleOsc.frequency.setTargetAtTime(targetFreq, this.audioCtx.currentTime, 0.08);
+            },
+
+            playFire() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(380, now);
+                osc.frequency.exponentialRampToValueAtTime(28, now + 0.22);
+
+                gain.gain.setValueAtTime(0.65, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            },
+
+            playUlti() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+
+                // Xung 1: Đề pa kích nổ
+                const osc1 = this.audioCtx.createOscillator();
+                const gain1 = this.audioCtx.createGain();
+                osc1.type = 'square';
+                osc1.frequency.setValueAtTime(450, now);
+                osc1.frequency.exponentialRampToValueAtTime(40, now + 0.15);
+                gain1.gain.setValueAtTime(0.7, now);
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.18);
+                osc1.connect(gain1); gain1.connect(this.audioCtx.destination);
+                osc1.start(now); osc1.stop(now + 0.18);
+
+                // Xung 2: Dư chấn đại bác siêu trầm
+                const osc2 = this.audioCtx.createOscillator();
+                const gain2 = this.audioCtx.createGain();
+                osc2.type = 'sawtooth';
+                osc2.frequency.setValueAtTime(180, now + 0.08);
+                osc2.frequency.exponentialRampToValueAtTime(18, now + 0.55);
+                gain2.gain.setValueAtTime(0.85, now + 0.08);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.6);
+                osc2.connect(gain2); gain2.connect(this.audioCtx.destination);
+                osc2.start(now + 0.08); osc2.stop(now + 0.6);
+            },
+
+            playHit() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                osc.type = 'triangle';
+                osc.frequency.setValueAtTime(850, now);
+                osc.frequency.exponentialRampToValueAtTime(110, now + 0.22);
+
+                gain.gain.setValueAtTime(0.6, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.25);
+            },
+
+            playReloadDone() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+
+                const osc1 = this.audioCtx.createOscillator();
+                const gain1 = this.audioCtx.createGain();
+                osc1.type = 'sine';
+                osc1.frequency.setValueAtTime(400, now);
+                gain1.gain.setValueAtTime(0.3, now);
+                gain1.gain.exponentialRampToValueAtTime(0.01, now + 0.08);
+                osc1.connect(gain1); gain1.connect(this.audioCtx.destination);
+                osc1.start(now); osc1.stop(now + 0.08);
+
+                const osc2 = this.audioCtx.createOscillator();
+                const gain2 = this.audioCtx.createGain();
+                osc2.type = 'sine';
+                osc2.frequency.setValueAtTime(750, now + 0.09);
+                gain2.gain.setValueAtTime(0.4, now + 0.09);
+                gain2.gain.exponentialRampToValueAtTime(0.01, now + 0.25);
+                osc2.connect(gain2); gain2.connect(this.audioCtx.destination);
+                osc2.start(now + 0.09); osc2.stop(now + 0.25);
+            },
+
+            playReloading() {
+                if (!config.sound) return;
+                this.init();
+                let t = this.audioCtx.currentTime;
+                for (let i = 0; i < 3; i++) {
+                    let osc = this.audioCtx.createOscillator();
+                    let gain = this.audioCtx.createGain();
+                    osc.type = 'triangle';
+                    osc.frequency.setValueAtTime(160 + i * 40, t);
+                    gain.gain.setValueAtTime(0.25, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + 0.07);
+                    osc.connect(gain); gain.connect(this.audioCtx.destination);
+                    osc.start(t); osc.stop(t + 0.07);
+                    t += 0.12;
+                }
+            },
+
+            playEmpty() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                osc.type = 'square';
+                osc.frequency.setValueAtTime(260, now);
+                osc.frequency.exponentialRampToValueAtTime(80, now + 0.06);
+
+                gain.gain.setValueAtTime(0.4, now);
+                gain.gain.exponentialRampToValueAtTime(0.01, now + 0.07);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 0.07);
+            },
+
+            playDeath() {
+                if (!config.sound) return;
+                this.init();
+                const now = this.audioCtx.currentTime;
+                const osc = this.audioCtx.createOscillator();
+                const gain = this.audioCtx.createGain();
+
+                osc.type = 'sawtooth';
+                osc.frequency.setValueAtTime(140, now);
+                osc.frequency.linearRampToValueAtTime(12, now + 1.2);
+
+                gain.gain.setValueAtTime(0.7, now);
+                gain.gain.linearRampToValueAtTime(0.001, now + 1.25);
+
+                osc.connect(gain);
+                gain.connect(this.audioCtx.destination);
+                osc.start(now);
+                osc.stop(now + 1.25);
+
+                this.stopEngine();
+            },
+
+            playGameStart() {
+                if (!config.sound) return;
+                this.init();
+                const notes = [300, 400, 600];
+                let t = this.audioCtx.currentTime;
+                notes.forEach((freq, idx) => {
+                    let osc = this.audioCtx.createOscillator();
+                    let gain = this.audioCtx.createGain();
+                    osc.type = 'sawtooth';
+                    osc.frequency.setValueAtTime(freq, t);
+                    gain.gain.setValueAtTime(0.35, t);
+                    gain.gain.exponentialRampToValueAtTime(0.01, t + (idx === 2 ? 0.35 : 0.15));
+                    osc.connect(gain); gain.connect(this.audioCtx.destination);
+                    osc.start(t); osc.stop(t + (idx === 2 ? 0.35 : 0.15));
+                    t += 0.16;
+                });
+            }
+        };
+
+        // ==========================================
+        // 2. CONFIG & PERSISTENCE
+        // ==========================================
+        const config = {
+            joystickMode: true,
+            invertLeft: false,
+            invertRight: false,
+            sound: true,
+            haptic: true
+        };
+
+        try {
+            const saved = localStorage.getItem('tank_config_v2');
+            if (saved) Object.assign(config, JSON.parse(saved));
+        } catch (e) {}
+
+        function saveConfig() {
+            localStorage.setItem('tank_config_v2', JSON.stringify(config));
+        }
+
+        // ==========================================
+        // 3. WEBSOCKET DRIVER LOOP (20Hz)
+        // ==========================================
+        const wsUrl = `ws://${window.location.hostname || '192.168.4.1'}/ws`;
+        let ws = null;
+        let leftPwm = 0, rightPwm = 0;
+        let sendTimer = null;
+
+        function connectWs() {
+            ws = new WebSocket(wsUrl);
+            ws.onopen = () => {
+                document.getElementById('status-tag').classList.remove('offline');
+                startSendLoop();
+            };
+            ws.onclose = () => {
+                document.getElementById('status-tag').innerText = 'OFFLINE';
+                document.getElementById('status-tag').className = 'state-tag offline';
+                stopSendLoop();
+                setTimeout(connectWs, 1500);
+            };
+            ws.onmessage = (event) => {
+                try {
+                    const data = JSON.parse(event.data);
+                    if (data.type === 'hud') {
+                        updateHud(data);
+                    } else if (data.type === 'roster') {
+                        updateRoster(data);
+                    } else if (data.type === 'profile_status') {
+                        showProfileStatus(data.status);
+                    } else if (data.type === 'net_status') {
+                        updateNetStatus(data);
+                    } else if (data.type === 'wifi_list') {
+                        renderWifiList(data.networks || []);
+                    } else if (data.type === 'wifi_status') {
+                        showWifiStatus(data.msg || data.status);
+                    }
+                } catch (e) {}
+            };
+        }
+
+        function startSendLoop() {
+            if (!sendTimer) {
+                sendTimer = setInterval(() => {
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        let l = isEngineOn ? (config.invertLeft ? -leftPwm : leftPwm) : 0;
+                        let r = isEngineOn ? (config.invertRight ? -rightPwm : rightPwm) : 0;
+                        ws.send(JSON.stringify({ type: "drive", left: l, right: r }));
+                    }
+                }, 50);
+            }
+        }
+
+        function stopSendLoop() {
+            if (sendTimer) {
+                clearInterval(sendTimer);
+                sendTimer = null;
+            }
+        }
+
+        // ==========================================
+        // 4. HUD UPDATE
+        // ==========================================
+        const hpRack = document.getElementById('hp-rack').children;
+        const shellRack = document.getElementById('shell-rack').children;
+        const statusTag = document.getElementById('status-tag');
+        const btnFire = document.getElementById('btn-fire');
+        const btnReload = document.getElementById('btn-reload');
+        const btnUlti = document.getElementById('btn-ulti');
+        const ultiPct = document.getElementById('ulti-pct');
+        const ultiBar = document.getElementById('ulti-bar');
+
+        function updateNetStatus(data) {
+            const isArena = (data.mode === 'arena');
+            const netBadge = document.getElementById('net-badge');
+            const modeLabel = document.getElementById('net-mode-label');
+            const infoLabel = document.getElementById('net-info-label');
+            const modalMode = document.getElementById('modal-net-mode');
+            const modalStaIp = document.getElementById('modal-sta-ip');
+            const modalChan = document.getElementById('modal-espnow-chan');
+
+            if (netBadge) {
+                netBadge.className = 'net-badge ' + (isArena ? 'arena' : 'standalone');
+            }
+            if (modeLabel) {
+                modeLabel.textContent = isArena ? 'ARENA' : 'STANDALONE';
+            }
+            if (infoLabel) {
+                infoLabel.textContent = isArena ? `(Ch.${data.channel} - ${data.ip})` : `(Ch.${data.channel || 1})`;
+            }
+            if (modalMode) {
+                modalMode.textContent = isArena ? 'ARENA (Đấu trường LAN)' : 'STANDALONE (Độc lập)';
+                modalMode.style.color = isArena ? 'var(--accent-green)' : 'var(--accent-cyan)';
+            }
+            if (modalStaIp) {
+                modalStaIp.textContent = isArena ? data.ip : 'Chưa kết nối';
+                modalStaIp.style.color = isArena ? 'var(--accent-green)' : 'var(--text-muted)';
+            }
+            if (modalChan) {
+                modalChan.textContent = `Channel ${data.channel || 1} ${isArena ? '(Sync Router)' : '(Khóa cố định)'}`;
+            }
+        }
+
+        let lastHp = 5;
+        let lastAmmo = 10;
+        let lastState = 'BATTLE';
+
+        function updateHud(data) {
+            if (data.team !== undefined) {
+                myCurrentTeam = data.team;
+                const teamBadge = document.getElementById('btn-team-profile');
+                const teamIcon = document.getElementById('team-icon-label');
+                const teamLabel = document.getElementById('team-name-label');
+                if (teamBadge && teamIcon && teamLabel) {
+                    if (myCurrentTeam === 1) {
+                        teamBadge.className = 'team-badge team-blue';
+                        teamIcon.textContent = '🔵';
+                        teamLabel.textContent = 'BLUE TEAM';
+                    } else {
+                        teamBadge.className = 'team-badge team-red';
+                        teamIcon.textContent = '🔴';
+                        teamLabel.textContent = 'RED TEAM';
+                    }
+                }
+            }
+            if (data.playerId !== undefined) {
+                myCurrentId = data.playerId;
+            }
+            if (data.callsign) {
+                myCurrentCallsign = data.callsign;
+                const displayName = document.getElementById('tank-display-name');
+                if (displayName) displayName.textContent = data.callsign.toUpperCase();
+            }
+
+            // Audio & Haptic Telemetry sync
+            if (data.hp !== undefined) {
+                if (data.hp < lastHp) {
+                    Sound.playHit();
+                    if (config.haptic && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                }
+                if (data.hp === 0 && lastHp > 0) {
+                    Sound.playDeath();
+                }
+                lastHp = data.hp;
+            }
+
+            if (data.ammo !== undefined) {
+                if (data.ammo === 0 && lastAmmo > 0) {
+                    Sound.playEmpty();
+                }
+                lastAmmo = data.ammo;
+            }
+
+            if (data.state !== undefined) {
+                if (data.state === 'RELOAD' && lastState !== 'RELOAD') {
+                    Sound.playReloading();
+                } else if (lastState === 'RELOAD' && data.state === 'BATTLE') {
+                    Sound.playReloadDone();
+                } else if (data.state === 'DEAD' && lastState !== 'DEAD') {
+                    Sound.playDeath();
+                }
+                lastState = data.state;
+            }
+
+            // HP Pips
+            for (let i = 0; i < hpRack.length; i++) {
+                if (i < data.hp) hpRack[i].classList.remove('depleted');
+                else hpRack[i].classList.add('depleted');
+            }
+            document.getElementById('hp-text').innerText = `${data.hp} / 5`;
+
+            // Shell Magazine
+            for (let i = 0; i < shellRack.length; i++) {
+                if (i < data.ammo) shellRack[i].classList.remove('spent');
+                else shellRack[i].classList.add('spent');
+            }
+            document.getElementById('ammo-count').innerText = `${data.ammo} / 10`;
+
+            // State
+            statusTag.innerText = data.state;
+            statusTag.className = 'state-tag';
+            if (data.state === 'STUN') statusTag.classList.add('stun');
+            if (data.state === 'DEAD') statusTag.classList.add('dead');
+            if (data.state === 'RELOAD') {
+                statusTag.classList.add('reload');
+                btnReload.classList.add('reloading');
+            } else {
+                btnReload.classList.remove('reloading');
+            }
+
+            // Lock Fire Button when unavailable
+            if (data.ammo === 0 || data.state === 'RELOAD' || data.state === 'DEAD' || data.state === 'STUN') {
+                btnFire.classList.add('locked');
+            } else {
+                btnFire.classList.remove('locked');
+            }
+
+            // Ultimate Gauge
+            const ulti = data.ulti || 0;
+            ultiPct.innerText = `${ulti}%`;
+            ultiBar.style.width = `${ulti}%`;
+            if (ulti >= 100) {
+                btnUlti.classList.add('ready');
+                document.getElementById('ulti-text').innerText = 'READY!';
+            } else {
+                btnUlti.classList.remove('ready');
+                document.getElementById('ulti-text').innerText = 'ULTI';
+            }
+
+            // Sync Engine State from ESP32
+            if (data.engine !== undefined && data.engine !== isEngineOn) {
+                setEngineUiState(data.engine);
+            }
+            if (data.state === 'DEAD' && isEngineOn) {
+                setEngineUiState(false);
+            }
+        }
+
+        // ==========================================
+        // 4B. ENGINE IGNITION START/STOP CONTROLLER
+        // ==========================================
+        let isEngineOn = false;
+        let ignitionTimer = null;
+        let ignitionCrankInterval = null;
+        let ignitionStartTime = 0;
+        const IGNITION_HOLD_TIME_MS = 1200;
+
+        const btnEngine = document.getElementById('btn-engine');
+        const engineProgressBar = document.getElementById('engine-progress-bar');
+        const engineLabel = document.getElementById('engine-label');
+        const engineSub = document.getElementById('engine-sub');
+        const engineIcon = document.getElementById('engine-icon');
+        const joystickZone = document.querySelector('.control-zone-left');
+        const weaponsZone = document.querySelector('.control-zone-right');
+
+        function setEngineUiState(running) {
+            isEngineOn = running;
+            if (running) {
+                if (btnEngine) {
+                    btnEngine.classList.remove('engine-off');
+                    btnEngine.classList.add('engine-on');
+                }
+                if (engineLabel) engineLabel.textContent = 'MÁY ĐANG NỔ';
+                if (engineSub) engineSub.textContent = '[CHẠM ĐỂ TẮT]';
+                if (engineIcon) engineIcon.textContent = '🟢';
+                if (engineProgressBar) engineProgressBar.style.width = '0%';
+                if (joystickZone) joystickZone.classList.remove('controls-locked-hint');
+                if (weaponsZone) weaponsZone.classList.remove('controls-locked-hint');
+                Sound.startEngine();
+            } else {
+                if (btnEngine) {
+                    btnEngine.classList.remove('engine-on');
+                    btnEngine.classList.add('engine-off');
+                }
+                if (engineLabel) engineLabel.textContent = 'GIỮ ĐỀ MÁY';
+                if (engineSub) engineSub.textContent = '[HOLD 1.2s]';
+                if (engineIcon) engineIcon.textContent = '⚡';
+                if (engineProgressBar) engineProgressBar.style.width = '0%';
+                if (joystickZone) joystickZone.classList.add('controls-locked-hint');
+                if (weaponsZone) weaponsZone.classList.add('controls-locked-hint');
+                if (typeof resetJoystick === 'function') resetJoystick();
+                Sound.stopEngine();
+            }
+        }
+
+        function cancelIgnitionHold() {
+            if (ignitionTimer) {
+                cancelAnimationFrame(ignitionTimer);
+                ignitionTimer = null;
+            }
+            if (ignitionCrankInterval) {
+                clearInterval(ignitionCrankInterval);
+                ignitionCrankInterval = null;
+            }
+            if (engineProgressBar && !isEngineOn) {
+                engineProgressBar.style.width = '0%';
+            }
+        }
+
+        function startIgnitionHold() {
+            if (isEngineOn) return;
+            cancelIgnitionHold();
+            ignitionStartTime = Date.now();
+
+            Sound.playCrank();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "engine_crank" }));
+            }
+            if (config.haptic && navigator.vibrate) navigator.vibrate(30);
+
+            ignitionCrankInterval = setInterval(() => {
+                if (isEngineOn) {
+                    cancelIgnitionHold();
+                    return;
+                }
+                Sound.playCrank();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "engine_crank" }));
+                }
+                if (config.haptic && navigator.vibrate) navigator.vibrate(30);
+            }, 180);
+
+            const animateIgnition = () => {
+                if (isEngineOn) return;
+                const elapsed = Date.now() - ignitionStartTime;
+                const pct = Math.min(100, (elapsed / IGNITION_HOLD_TIME_MS) * 100);
+                if (engineProgressBar) engineProgressBar.style.width = `${pct}%`;
+
+                if (elapsed >= IGNITION_HOLD_TIME_MS) {
+                    // Đề máy thành công!
+                    cancelIgnitionHold();
+                    setEngineUiState(true);
+                    Sound.playIgnitionSuccess();
+                    if (config.haptic && navigator.vibrate) navigator.vibrate(100);
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "engine", start: true }));
+                    }
+                } else {
+                    ignitionTimer = requestAnimationFrame(animateIgnition);
+                }
+            };
+            ignitionTimer = requestAnimationFrame(animateIgnition);
+        }
+
+        if (btnEngine) {
+            btnEngine.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                if (isEngineOn) {
+                    setEngineUiState(false);
+                    if (config.haptic && navigator.vibrate) navigator.vibrate(50);
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "engine", start: false }));
+                    }
+                } else {
+                    startIgnitionHold();
+                }
+            }, { passive: false });
+
+            btnEngine.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                if (!isEngineOn) cancelIgnitionHold();
+            }, { passive: false });
+
+            btnEngine.addEventListener('touchcancel', () => {
+                if (!isEngineOn) cancelIgnitionHold();
+            });
+
+            btnEngine.addEventListener('mousedown', (e) => {
+                if (isEngineOn) {
+                    setEngineUiState(false);
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "engine", start: false }));
+                    }
+                } else {
+                    startIgnitionHold();
+                }
+            });
+
+            window.addEventListener('mouseup', () => {
+                if (!isEngineOn) cancelIgnitionHold();
+            });
+        }
+
+        // ==========================================
+        // 5. ERGONOMIC VIRTUAL JOYSTICK 360°
+        // ==========================================
+        const joystickBase = document.getElementById('joystick-base');
+        const joystickThumb = document.getElementById('joystick-thumb');
+        let joyTouchId = null;
+        const maxRadius = 60;
+
+        function updateTelemetry() {
+            const pctL = Math.round((leftPwm / 255) * 100);
+            const pctR = Math.round((rightPwm / 255) * 100);
+            document.getElementById('tele-l').innerText = `${pctL > 0 ? '+' : ''}${pctL}%`;
+            document.getElementById('tele-r').innerText = `${pctR > 0 ? '+' : ''}${pctR}%`;
+        }
+
+        function handleJoystick(x, y) {
+            if (!isEngineOn) {
+                leftPwm = 0;
+                rightPwm = 0;
+                updateTelemetry();
+                return;
+            }
+
+            // Distance from center
+            let dist = Math.hypot(x, y);
+            let angle = Math.atan2(y, x);
+
+            if (dist > maxRadius) {
+                dist = maxRadius;
+                x = Math.cos(angle) * maxRadius;
+                y = Math.sin(angle) * maxRadius;
+            }
+
+            joystickThumb.style.transform = `translate(${x}px, ${y}px)`;
+
+            // Arcade Drive Differential Mix
+            // Forward: -Y, Backward: +Y
+            // Left: -X, Right: +X
+            let forward = -y / maxRadius; // -1.0 to +1.0
+            let turn = x / maxRadius;      // -1.0 to +1.0
+
+            let left = forward + turn;
+            let right = forward - turn;
+
+            // Normalize
+            let maxMag = Math.max(Math.abs(left), Math.abs(right));
+            if (maxMag > 1.0) {
+                left /= maxMag;
+                right /= maxMag;
+            }
+
+            // Deadband (5%)
+            if (Math.abs(left) < 0.05) left = 0;
+            if (Math.abs(right) < 0.05) right = 0;
+
+            leftPwm = Math.round(left * 255);
+            rightPwm = Math.round(right * 255);
+            updateTelemetry();
+
+            let maxSpeed = Math.max(Math.abs(leftPwm), Math.abs(rightPwm));
+            Sound.setThrottle(Math.round((maxSpeed / 255) * 100));
+        }
+
+        function resetJoystick() {
+            joystickThumb.style.transition = 'transform 0.12s ease-out';
+            joystickThumb.style.transform = 'translate(0px, 0px)';
+            leftPwm = 0;
+            rightPwm = 0;
+            updateTelemetry();
+            Sound.setThrottle(0);
+            setTimeout(() => { joystickThumb.style.transition = ''; }, 120);
+        }
+
+        joystickBase.addEventListener('touchstart', (e) => {
+            if (joyTouchId !== null) return;
+            const t = e.changedTouches[0];
+            joyTouchId = t.identifier;
+            joystickThumb.style.transition = '';
+            const rect = joystickBase.getBoundingClientRect();
+            const centerX = rect.left + rect.width / 2;
+            const centerY = rect.top + rect.height / 2;
+            handleJoystick(t.clientX - centerX, t.clientY - centerY);
+        }, { passive: false });
+
+        window.addEventListener('touchmove', (e) => {
+            if (joyTouchId === null) return;
+            for (let i = 0; i < e.touches.length; i++) {
+                if (e.touches[i].identifier === joyTouchId) {
+                    const t = e.touches[i];
+                    const rect = joystickBase.getBoundingClientRect();
+                    const centerX = rect.left + rect.width / 2;
+                    const centerY = rect.top + rect.height / 2;
+                    handleJoystick(t.clientX - centerX, t.clientY - centerY);
+                    break;
+                }
+            }
+        }, { passive: false });
+
+        function onTouchEndJoy(e) {
+            for (let i = 0; i < e.changedTouches.length; i++) {
+                if (e.changedTouches[i].identifier === joyTouchId) {
+                    joyTouchId = null;
+                    resetJoystick();
+                    break;
+                }
+            }
+        }
+        window.addEventListener('touchend', onTouchEndJoy);
+        window.addEventListener('touchcancel', onTouchEndJoy);
+
+        // ==========================================
+        // 6. WEAPONS ACTIONS
+        // ==========================================
+        btnFire.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!isEngineOn) {
+                Sound.playEmpty();
+                return;
+            }
+            if (btnFire.classList.contains('locked')) {
+                Sound.playEmpty();
+                return;
+            }
+            if (config.haptic && navigator.vibrate) navigator.vibrate(60);
+            Sound.playFire();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "fire" }));
+            }
+        });
+
+        btnReload.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!isEngineOn) {
+                Sound.playEmpty();
+                return;
+            }
+            if (config.haptic && navigator.vibrate) navigator.vibrate(40);
+            Sound.playReloading();
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "reload" }));
+            }
+        });
+
+        btnUlti.addEventListener('touchstart', (e) => {
+            e.preventDefault();
+            if (!isEngineOn) {
+                Sound.playEmpty();
+                return;
+            }
+            if (btnUlti.classList.contains('ready')) {
+                if (config.haptic && navigator.vibrate) navigator.vibrate([100, 50, 100]);
+                Sound.playUlti();
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "ulti" }));
+                }
+            } else {
+                Sound.playEmpty();
+            }
+        });
+
+        // ==========================================
+        // 7. FULLSCREEN & WAKELOCK (MÀN HÌNH KHÔNG TẮT)
+        // ==========================================
+        document.getElementById('btn-fullscreen').onclick = () => {
+            if (!document.fullscreenElement) {
+                document.documentElement.requestFullscreen().catch(() => {});
+            } else {
+                document.exitFullscreen().catch(() => {});
+            }
+        };
+
+        if ('wakeLock' in navigator) {
+            navigator.wakeLock.request('screen').catch(() => {});
+        }
+
+        // ==========================================
+        // 8. SETTINGS MODAL & WI-FI PROVISIONING
+        // ==========================================
+        const modal = document.getElementById('settings-modal');
+        document.getElementById('btn-settings').onclick = () => { modal.classList.add('active'); };
+        document.getElementById('modal-close').onclick = () => { modal.classList.remove('active'); };
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) modal.classList.remove('active');
+        });
+
+        function setupToggle(elemId, key, callback) {
+            const el = document.getElementById(elemId);
+            if (config[key]) el.classList.add('on');
+            else el.classList.remove('on');
+            el.onclick = () => {
+                config[key] = !config[key];
+                if (config[key]) el.classList.add('on');
+                else el.classList.remove('on');
+                saveConfig();
+                if (callback) callback(config[key]);
+            };
+        }
+
+        setupToggle('toggle-joystick-mode', 'joystickMode', (isJoy) => {
+            if (isJoy) {
+                document.getElementById('joystick-base').style.display = 'flex';
+                document.getElementById('levers-container').style.display = 'none';
+            } else {
+                document.getElementById('joystick-base').style.display = 'none';
+                document.getElementById('levers-container').style.display = 'flex';
+            }
+        });
+        setupToggle('toggle-inv-left', 'invertLeft');
+        setupToggle('toggle-inv-right', 'invertRight');
+        setupToggle('toggle-sound', 'sound');
+        setupToggle('toggle-haptic', 'haptic');
+
+        document.getElementById('btn-reset-match').onclick = () => {
+            setEngineUiState(false);
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "reset" }));
+            }
+            modal.classList.remove('active');
+        };
+
+        // Wi-Fi Controls
+        const wifiSelect = document.getElementById('wifi-ssid-select');
+        const wifiInput = document.getElementById('wifi-ssid-input');
+        const wifiPass = document.getElementById('wifi-pass-input');
+        const wifiStatusMsg = document.getElementById('wifi-status-msg');
+
+        function showWifiStatus(msg) {
+            if (!wifiStatusMsg) return;
+            wifiStatusMsg.textContent = msg;
+            wifiStatusMsg.style.display = 'block';
+        }
+
+        function renderWifiList(networks) {
+            if (!wifiSelect) return;
+            wifiSelect.innerHTML = '<option value="">-- Danh sách Wi-Fi quét được --</option>';
+            if (networks.length === 0) {
+                showWifiStatus('Không tìm thấy mạng Wi-Fi nào.');
+                return;
+            }
+            networks.forEach(ssid => {
+                const opt = document.createElement('option');
+                opt.value = ssid;
+                opt.textContent = ssid;
+                wifiSelect.appendChild(opt);
+            });
+            showWifiStatus(`Đã tìm thấy ${networks.length} mạng Wi-Fi.`);
+        }
+
+        if (wifiSelect) {
+            wifiSelect.onchange = () => {
+                if (wifiSelect.value) wifiInput.value = wifiSelect.value;
+            };
+        }
+
+        document.getElementById('btn-scan-wifi').onclick = () => {
+            showWifiStatus('Đang quét mạng Wi-Fi (chờ 2s)...');
+            if (ws && ws.readyState === WebSocket.OPEN) {
+                ws.send(JSON.stringify({ type: "scan_wifi" }));
+            }
+        };
+
+        document.getElementById('btn-save-wifi').onclick = () => {
+            const ssid = wifiInput.value.trim();
+            const pass = wifiPass.value.trim();
+            if (!ssid) {
+                alert('Vui lòng chọn hoặc nhập tên mạng Wi-Fi!');
+                return;
+            }
+            if (confirm(`Lưu Wi-Fi "${ssid}" vào xe và khởi động lại?`)) {
+                showWifiStatus(`Đang lưu "${ssid}"... Xe đang khởi động lại!`);
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "save_wifi", ssid: ssid, pass: pass }));
+                }
+            }
+        };
+
+        const netBadgeElem = document.getElementById('net-badge');
+        if (netBadgeElem) {
+            netBadgeElem.onclick = () => { modal.classList.add('active'); };
+        }
+
+        const btnQuickForget = document.getElementById('btn-quick-forget');
+        if (btnQuickForget) {
+            btnQuickForget.onclick = () => {
+                if (confirm('Quên Wi-Fi nhà để xe duy trì SoftAP 192.168.4.1 (Kênh 1)?')) {
+                    showWifiStatus('Đang quên Wi-Fi... Chuyển về chế độ độc lập.');
+                    if (ws && ws.readyState === WebSocket.OPEN) {
+                        ws.send(JSON.stringify({ type: "reset_wifi" }));
+                    }
+                }
+            };
+        }
+
+        document.getElementById('btn-reset-wifi').onclick = () => {
+            if (confirm('Quên Wi-Fi nhà để xe trở về chế độ Độc lập (192.168.4.1 - Kênh 1)?')) {
+                showWifiStatus('Đang xóa Wi-Fi... Xe duy trì SoftAP 192.168.4.1');
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({ type: "reset_wifi" }));
+                }
+            }
+        };
+
+
+        // ==========================================
+        // SQUAD ROSTER & PROFILE LOGIC
+        // ==========================================
+        let currentRoster = null;
+        let myCurrentTeam = 1;
+        let myCurrentId = 1;
+        let myCurrentCallsign = "Tiger-01";
+        let selectedModalTeam = 1;
+
+        function escapeHtml(str) {
+            return (str || '').replace(/[&<>"']/g, m => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'})[m]);
+        }
+
+        function updateRoster(data) {
+            currentRoster = data;
+            const squadList = document.getElementById('squad-roster-list');
+            const squadRatio = document.getElementById('squad-ratio-badge');
+            const squadPill = document.getElementById('squad-count-pill');
+            const modalRosterList = document.getElementById('modal-lobby-roster-list');
+
+            if (squadRatio) {
+                squadRatio.textContent = `🔵 ${data.blueCount || 0} vs 🔴 ${data.redCount || 0}`;
+            }
+            if (squadPill) {
+                const mySquadCount = (myCurrentTeam === 1) ? (data.blueCount || 1) : (data.redCount || 1);
+                squadPill.textContent = `${mySquadCount}P`;
+            }
+
+            if (!squadList) return;
+
+            const peers = data.peers || [];
+            if (peers.length === 0) {
+                squadList.innerHTML = '<div style="font-size: 9px; color: var(--text-muted); text-align: center; padding: 4px;">Đang dò tìm đồng đội & đối thủ qua Mesh...</div>';
+            } else {
+                let html = '';
+                peers.forEach(p => {
+                    const isBlue = (p.team === 1);
+                    const teamClass = isBlue ? 'blue' : 'red';
+                    const teamIcon = isBlue ? '🔵' : '🔴';
+                    const stateClass = (p.state || 'BATTLE').toLowerCase();
+
+                    let pipsHtml = '';
+                    for (let i = 0; i < (p.maxHp || 5); i++) {
+                        const pipClass = (i < p.hp) ? (isBlue ? 'blue' : 'red') : 'depleted';
+                        pipsHtml += `<div class="squad-pip ${pipClass}"></div>`;
+                    }
+
+                    html += `
+                        <div class="squad-member-item ${teamClass}">
+                            <div class="squad-member-name">
+                                <span>${teamIcon}</span>
+                                <span>${escapeHtml(p.name || ('Xe #' + p.id))}</span>
+                            </div>
+                            <div class="squad-member-hp-pips">${pipsHtml}</div>
+                            <span class="squad-member-tag ${stateClass}">${p.state || 'BATTLE'}</span>
+                        </div>
+                    `;
+                });
+                squadList.innerHTML = html;
+            }
+
+            if (modalRosterList) {
+                if (peers.length === 0) {
+                    modalRosterList.innerHTML = '<div style="font-size: 11px; color: var(--text-muted); text-align: center; padding: 8px;">Chưa có xe nào khác online trong kênh ESP-NOW Mesh.</div>';
+                } else {
+                    let mHtml = '';
+                    peers.forEach(p => {
+                        const isBlue = (p.team === 1);
+                        mHtml += `
+                            <div style="display: flex; justify-content: space-between; align-items: center; padding: 6px 8px; background: #141f2e; border-radius: 4px; border-left: 3px solid ${isBlue ? 'var(--accent-cyan)' : 'var(--accent-red)'}; font-size: 11px;">
+                                <span>${isBlue ? '🔵' : '🔴'} <b>${escapeHtml(p.name)}</b> (#${p.id})</span>
+                                <span style="color: ${p.hp > 0 ? 'var(--accent-green)' : 'var(--accent-red)'}; font-weight: bold;">HP: ${p.hp}/${p.maxHp} [${p.state}]</span>
+                            </div>
+                        `;
+                    });
+                    modalRosterList.innerHTML = mHtml;
+                }
+            }
+        }
+
+        function showProfileStatus(status) {
+            const statusMsg = document.getElementById('profile-status-msg');
+            if (statusMsg) {
+                statusMsg.textContent = 'Đã lưu thành công! Xe đã đổi màu LED và cập nhật Mesh.';
+                setTimeout(() => {
+                    statusMsg.textContent = '';
+                    const lobbyModal = document.getElementById('lobby-modal');
+                    if (lobbyModal) lobbyModal.classList.remove('active');
+                }, 900);
+            }
+        }
+
+        // Lobby Modal Handlers
+        const lobbyModal = document.getElementById('lobby-modal');
+        const btnOpenLobby = document.getElementById('btn-lobby-open');
+        const btnTeamProfile = document.getElementById('btn-team-profile');
+        const btnCloseLobby = document.getElementById('lobby-close');
+
+        function openLobbyModal() {
+            if (lobbyModal) {
+                const inputName = document.getElementById('input-callsign');
+                const selId = document.getElementById('select-player-id');
+                if (inputName) inputName.value = myCurrentCallsign;
+                if (selId) selId.value = myCurrentId;
+                selectTeamInModal(myCurrentTeam);
+                lobbyModal.classList.add('active');
+            }
+        }
+
+        function selectTeamInModal(team) {
+            selectedModalTeam = team;
+            const cardBlue = document.getElementById('card-team-blue');
+            const cardRed = document.getElementById('card-team-red');
+            if (cardBlue && cardRed) {
+                if (team === 1) {
+                    cardBlue.classList.add('selected');
+                    cardRed.classList.remove('selected');
+                } else {
+                    cardRed.classList.add('selected');
+                    cardBlue.classList.remove('selected');
+                }
+            }
+        }
+
+        if (btnOpenLobby) btnOpenLobby.onclick = openLobbyModal;
+        if (btnTeamProfile) btnTeamProfile.onclick = openLobbyModal;
+        if (btnCloseLobby) btnCloseLobby.onclick = () => { if (lobbyModal) lobbyModal.classList.remove('active'); };
+        if (lobbyModal) {
+            lobbyModal.addEventListener('click', (e) => {
+                if (e.target === lobbyModal) lobbyModal.classList.remove('active');
+            });
+        }
+
+        const cBlue = document.getElementById('card-team-blue');
+        const cRed = document.getElementById('card-team-red');
+        if (cBlue) cBlue.onclick = () => selectTeamInModal(1);
+        if (cRed) cRed.onclick = () => selectTeamInModal(2);
+
+        const btnSaveProf = document.getElementById('btn-save-profile');
+        if (btnSaveProf) {
+            btnSaveProf.onclick = () => {
+                const name = document.getElementById('input-callsign').value.trim();
+                const pid = parseInt(document.getElementById('select-player-id').value) || 1;
+                const statusMsg = document.getElementById('profile-status-msg');
+                if (statusMsg) statusMsg.textContent = 'Đang đồng bộ cấu hình vào xe...';
+
+                if (ws && ws.readyState === WebSocket.OPEN) {
+                    ws.send(JSON.stringify({
+                        type: "set_profile",
+                        name: name,
+                        team: selectedModalTeam,
+                        id: pid
+                    }));
+                }
+            };
+        }
+
+        // Unlock AudioContext on first interaction
+        const unlockAudio = () => {
+            Sound.init();
+            if (isEngineOn) {
+                Sound.startEngine();
+            }
+            window.removeEventListener('touchstart', unlockAudio);
+            window.removeEventListener('click', unlockAudio);
+        };
+        window.addEventListener('touchstart', unlockAudio, { passive: true });
+        window.addEventListener('click', unlockAudio, { passive: true });
+
+        // Engine default state: OFF (Hold to Start)
+        setEngineUiState(false);
+
+        // Start WebSocket
+        connectWs();
+    </script>
+</body>
+</html>
